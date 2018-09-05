@@ -12,7 +12,7 @@ at a certain speed.
 
 Here are the routes:
 admin route:   to download file
-/flag:         submit ur own flag
+/flag?flag=xxxx&token=xxxx&ip=xxxx:         submit ur own flag
 /flag_all:     print all the flag in the queue
 
 
