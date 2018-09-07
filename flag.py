@@ -36,14 +36,14 @@ import time
 ###### configuration #######
 
 # the listen port
-listen_port = 8081
+listen_port = 8888
 
 # remote flag submit	
-# remote_flag_url = 'https://172.17.4.1/Common/awd_sub_answer'
-remote_flag_url = 'http://127.0.0.1/Common/awd_sub_answer'
+remote_flag_url = 'https://172.16.4.1/Common/awd_sub_answer'
+# remote_flag_url = 'http://ss/Common/awd_sub_answer'
 
 # team token
-token = 'a7e1ddc8600015b6a55ad1fc15cd8c2c'
+token = '3b72366f3d32af726342e3242e6bcfe8'
 
 # team cookie
 team_cookie = {"phpsessid":"haozigege"}
@@ -61,10 +61,10 @@ time_out = 3
 admin_router = '/haozigege666'
 
 # file manager base
-dir_base = '/tmp'
+dir_base = './'
 
 # flag submit log
-flag_log_file = './flag.log'
+flag_log_file = './flag_log'
 
 # store the flag in the queue
 flag_save_file = './flag_all'
@@ -82,6 +82,8 @@ flag_load_file = './flag_load'
 	empty queue
 
 '''
+
+
 queue = Queue.Queue(1000)
 old_flags = open(flag_load_file).readlines()
 if len(old_flags) > 1:
@@ -99,6 +101,37 @@ def check_flag(flag):
 		return True
 	return False
 
+def write_log(info,status):
+	'''
+		save the log to local logs
+	'''
+
+	flag , my_token , ip , sender_ip , now_time = info
+	now_gmtime = time.gmtime(time.time())
+	now_time = strftime("%H:%M:%S", now_gmtime)
+
+	if status == 'success':
+		prefix = "[*] success: "
+	else:
+		prefix = "[!] error: "
+
+	msg = prefix + now_time + ' => flag:' +flag + ' form ' + ip + ' results: ' + status + "\n"
+	
+
+	open(flag_log_file,'a').write(msg)
+
+	
+
+def check_duplicate(flag):
+	'''
+		to judge whether a flag has been stored in the queue
+	'''
+	all_flags = list(queue.queue)
+	tmp_flag = [all_flag.split('|*|')[0] for all_flag in all_flags]
+	if flag in tmp_flag:
+		return True
+	return False
+
 
 def flag_submit():
 	# submit the flag
@@ -106,8 +139,9 @@ def flag_submit():
 
 		# get info from queue
 		if queue.empty():
+			time.sleep(2)
 			continue
-		info = queue.get(1).split(':')
+		info = queue.get().split('|*|')
 		flag , my_token , ip , sender_ip , now_time = info
 
 		# you may need to change the args
@@ -118,8 +152,7 @@ def flag_submit():
 			r = requests.post(remote_flag_url,cookies=team_cookie,data=data,timeout=time_out,verify=False)
 			result = r.content
 		except Exception,e:
-			print e
-			result = 'error: ' + str(e)
+			result = 'connection error'
 			
 		check_result(result,info)
 
@@ -127,12 +160,32 @@ def flag_submit():
 
 
 def check_result(result,info):
+	'''
+		check the response from the server
+	'''
 	if 'success' in result:
-		print("success")
-	elif 'error' in result:
-		print("error")
+		print("[*] congrats: success")
+		write_log(info,'success')
+
+	elif 'wrong answer' in result:
+		print("[!] flag submit error: wrong answer")
+		write_log(info,'wrong answer')
+
+	elif 'duplicate' in result:
+		print("[!] flag submit error: duplicate")
+		write_log(info,'duplicate')
+
+	elif 'too frequently' in result:
+		print("[!] flag submit error: too frequently")
+		write_log(info,'too frequently')
+
+	elif 'connection error' in result:
+		print("[!] flag submit error: connection error")
+		write_log(info,'connection error')
+
 	else:
-		print("uncaughted error")
+		print("[!] flag submit error: uncaughted error")
+		write_log(info,'uncaughted error')
 
 
 # my custom class to play with fun
@@ -193,6 +246,11 @@ class CustomHTTPRequestHandler(SimpleHTTPServer.SimpleHTTPRequestHandler):
 			self.error_handle('flag check error!')
 			return
 
+		if check_duplicate(flag):
+			print '[!] flag duplicated'
+			self.success_handle('success (although duplicate): ' + 'qsize ' + str(queue.qsize()))
+			return
+
 		# if the token has been set, use the udf token for scalability
 		if params.has_key('token'):
 			my_token = params['token'][0]
@@ -213,13 +271,14 @@ class CustomHTTPRequestHandler(SimpleHTTPServer.SimpleHTTPRequestHandler):
 		# the time when receive the flag
 		now_time = str(int(time.time()))
 
-		info = flag + ':' + my_token + ':' + ip + ':' + sender_ip + ':' + now_time
+		info = flag + '|*|' + my_token + '|*|' + ip + '|*|' + sender_ip + '|*|' + now_time
 
 		queue.put(info)
-		print '[*] flag add success!'
-		print '[*] info: ' + info
+		print '[*] flag add : ' + info
 		print '[*] queue size ' + str(queue.qsize())
-		self.success_handle('success: ' + 'qsize ' + str(queue.qsize()))
+
+		self.success_handle('success : ' + 'qsize ' + str(queue.qsize()))
+
 
 
 	def error_handle(self,msg):
@@ -285,9 +344,9 @@ class CustomHTTPRequestHandler(SimpleHTTPServer.SimpleHTTPRequestHandler):
 
 # update the server_bind function to reuse the port 
 class MyTCPServer(SocketServer.TCPServer):
-    def server_bind(self):
-        self.socket.setsockopt(socket.SOL_SOCKET, socket.SO_REUSEADDR, 1)
-        self.socket.bind(self.server_address)
+	def server_bind(self):
+		self.socket.setsockopt(socket.SOL_SOCKET, socket.SO_REUSEADDR, 1)
+		self.socket.bind(self.server_address)
 
 t = threading.Thread(target=flag_submit,name='flag_submit')
 t.setDaemon(True)
