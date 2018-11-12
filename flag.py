@@ -1,4 +1,5 @@
 #!/usr/bin/env python2
+# -*- coding: utf-8 -*-
 
 '''
 
@@ -33,23 +34,24 @@ from urlparse import parse_qs,urlparse
 import time
 
 
+
 ###### configuration #######
 
 # the listen port
 listen_port = 8888
 
 # remote flag submit	
-remote_flag_url = 'https://172.16.4.1/Common/awd_sub_answer'
+remote_flag_url = 'http://47.105.92.202:8080/flag_file.php'
 # remote_flag_url = 'http://ss/Common/awd_sub_answer'
 
 # team token
-token = '3b72366f3d32af726342e3242e6bcfe8'
+token = 'team1'
 
 # team cookie
 team_cookie = {"phpsessid":"haozigege"}
 
 # flag regex pattern
-flag_regex_pattern = "[0-9a-fA-F\-]{36}"
+flag_regex_pattern = "[0-9a-fA-F\-]{32}"
 
 # flag submit span
 time_span = 3
@@ -145,16 +147,17 @@ def flag_submit():
 		flag , my_token , ip , sender_ip , now_time = info
 
 		# you may need to change the args
-		data = {'token':my_token,'answer':flag}
+		data = {'token':my_token,'flag':flag}
 
 		try:
 
-			r = requests.post(remote_flag_url,cookies=team_cookie,data=data,timeout=time_out,verify=False)
+			r = requests.get(remote_flag_url,cookies=team_cookie,params=data,timeout=time_out,verify=False)
 			result = r.content
 		except Exception,e:
 			result = 'connection error'
 			
 		check_result(result,info)
+                print result
 
 		time.sleep(time_span)
 
